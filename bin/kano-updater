@@ -11,7 +11,7 @@ kano-updater will help you keep your Kano OS up-to-date.
 
 Usage:
   kano-updater check [--gui] [--interval <time>] [--urgent]
-  kano-updater download [--low-prio]
+  kano-updater download [--low-prio] [--no-notifications]
   kano-updater install [--gui [--no-confirm] [--splash-pid <pid>]]
   kano-updater set-state <state>
   kano-updater set-scheduled (1|0)
@@ -23,13 +23,14 @@ Usage:
   kano-updater [-f] [-n]
 
 Options:
-  -h, --help       Show this message.
-  -v, --version    Print the version of the updater.
-  -g, --gui        Run the install procedure with a GUI.
-  -l, --low-prio   Run the process with low shed and io priority.
-  --interval       Minimum time interval between checks (in hours)
-  --no-confirm     Don't confirm before installing
-  --urgent         Check for urgent updates
+  -h, --help           Show this message.
+  -v, --version        Print the version of the updater.
+  -g, --gui            Run the install procedure with a GUI.
+  -l, --low-prio       Run the process with low shed and io priority.
+  --interval           Minimum time interval between checks (in hours)
+  --no-confirm         Don't confirm before installing
+  --no-notifications   Do not send enable or disable control notifications
+  --urgent             Check for urgent updates
 """
 
 
@@ -77,14 +78,16 @@ def sigterm_on_download(signo, frame):
     sys.exit(0)
 
 
-def clean_up():
+def clean_up(send_notification=True):
     remove_pid_file()
 
     status = UpdaterStatus.get_instance()
     status.notifications_muted = False
     status.save()
 
-    resume_notifications()
+    if send_notification:
+        resume_notifications()
+
     logger.flush()
 
 
@@ -171,7 +174,10 @@ def main():
 
     # This is registered after the test for whether an updater was already
     # running, because it deletes the pid file.
-    atexit.register(clean_up)
+    if args['download'] and args['--no-notifications']:
+        atexit.register(clean_up, send_notification=False)
+    else:
+        atexit.register(clean_up)
 
     if args['set-state']:
         status = UpdaterStatus.get_instance()
